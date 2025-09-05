@@ -1,0 +1,48 @@
+openapi: 3.0.0
+info:
+  title: kintone API
+  version: 1.0.0
+servers:
+  - url: https://あなたのサービス名.onrender.com # ここはPoeでは無視されます
+paths:
+  /getRecords:
+    post:
+      summary: kintoneアプリからレコードを取得します
+      description: 条件を指定してkintoneアプリからレコードの一覧を取得します。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app:
+                  type: string
+                  description: kintoneアプリのID
+                query:
+                  type: string
+                  description: "絞り込み条件（例: ステータス = \"未処理\" limit 5）"
+      responses:
+        "200":
+          description: 成功時のレスポンス
+  /addRecord:
+    post:
+      summary: kintoneアプリにレコードを1件登録します
+      description: 指定されたフィールドの値を持つレコードを1件kintoneアプリに登録します。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app:
+                  type: string
+                  description: kintoneアプリのID
+                record:
+                  type: object
+                  description: "登録するレコードのデータ（例: { \"会社名\": { \"value\": \"株式会社サンプル\" } }）"
+                  additionalProperties: true
+      responses:
+        "200":
+          description: 成功時のレスポンス
