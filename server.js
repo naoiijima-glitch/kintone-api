@@ -27,7 +27,7 @@ const app = express();
 app.use(express.json());
 
 // すべてのAPIリクエストの前に、必ず「門番」を通るように設定
-app.use(authMiddleware);
+// app.use(authMiddleware);
 
 // kintone クライアントを初期化
 // 環境変数はRender側で設定します
