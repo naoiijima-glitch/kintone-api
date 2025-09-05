@@ -1,0 +1,14 @@
+{
+  "name": "kintone-api",
+  "version": "1.0.0",
+  "description": "A simple API server for kintone",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@kintone/rest-api-client": "^5.0.4",
+    "express": "^4.19.2"
+  }
+}
