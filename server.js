@@ -1,9 +1,33 @@
 import express from "express";
 import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 
+// アクセスキーを検証する「門番」の役割を持つ関数（ミドルウェア）
+const authMiddleware = (req, res, next) => {
+  // Renderに設定したアクセスキーを取得
+  const expectedKey = process.env.POE_ACCESS_KEY;
+
+  // Renderにキーが設定されていなければ、チェックをスキップ（テスト用）
+  if (!expectedKey) {
+    return next();
+  }
+
+  // Poeから送られてくるリクエストヘッダーを取得
+  const authHeader = req.headers.authorization;
+  
+  // ヘッダーのキーと、設定したキーが一致するか確認
+  if (authHeader === `Bearer ${expectedKey}`) {
+    next(); // 一致すれば、次の処理へ進む
+  } else {
+    res.status(401).send("Unauthorized"); // 一致しなければ、ここで処理を止める
+  }
+};
+
 // Expressアプリを初期化
 const app = express();
 app.use(express.json());
+
+// すべてのAPIリクエストの前に、必ず「門番」を通るように設定
+app.use(authMiddleware);
 
 // kintone クライアントを初期化
 // 環境変数はRender側で設定します
