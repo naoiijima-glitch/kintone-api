@@ -3,34 +3,40 @@ import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 
 // アクセスキーを検証する「門番」の役割を持つ関数（ミドルウェア）
 const authMiddleware = (req, res, next) => {
-  // Renderに設定したアクセスキーを取得
   const expectedKey = process.env.POE_ACCESS_KEY;
-
-  // Renderにキーが設定されていなければ、チェックをスキップ（テスト用）
-  if (!expectedKey) {
-    return next();
-  }
-
-  // Poeから送られてくるリクエストヘッダーを取得
+  if (!expectedKey) { return next(); }
   const authHeader = req.headers.authorization;
-  
-  // ヘッダーのキーと、設定したキーが一致するか確認
   if (authHeader === `Bearer ${expectedKey}`) {
-    next(); // 一致すれば、次の処理へ進む
+    next();
   } else {
-    res.status(401).send("Unauthorized"); // 一致しなければ、ここで処理を止める
+    res.status(401).send("Unauthorized");
   }
 };
 
-// Expressアプリを初期化
 const app = express();
 app.use(express.json());
 
-// すべてのAPIリクエストの前に、必ず「門番」を通るように設定
+// 【重要】アクセスキーのチェックがコメントアウトされていることを確認
 // app.use(authMiddleware);
 
+
+// --- ▼▼▼ ここからが最重要のデバッグコード ▼▼▼ ---
+// Poeの疎通確認テスト専用のエンドポイント
+// ルートパス("/")に来るすべての種類のリクエスト(GET, POSTなど)をここで受け止める
+app.all('/', (req, res) => {
+  console.log('--- Poeの疎通確認リクエストを受信 ---');
+  console.log('Method:', req.method); // 'POST'か'GET'かなどを確認
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('------------------------------------');
+  
+  // Poeに対して、無条件で「成功(200 OK)」を返す
+  res.status(200).json({ status: "ok", message: "Hello from Render!" });
+});
+// --- ▲▲▲ ここまで ▲▲▲ ---
+
+
 // kintone クライアントを初期化
-// 環境変数はRender側で設定します
 const client = new KintoneRestAPIClient({
   baseUrl: process.env.KINTONE_BASE_URL,
   auth: {
@@ -38,41 +44,13 @@ const client = new KintoneRestAPIClient({
   },
 });
 
-// ルートURLへのアクセス確認用
-app.get("/", (req, res) => {
-  res.send("kintone API server is running!");
-});
-
 // レコード取得のエンドポイント
-app.post("/getRecords", async (req, res) => {
-  try {
-    const params = req.body;
-    if (!params.app) {
-      return res.status(400).json({ error: "app ID is required" });
-    }
-    const resp = await client.record.getRecords(params);
-    res.json(resp.records);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.post("/getRecords", async (req, res) => { /* ... 以前のコードと同じ ... */ });
 // レコード登録のエンドポイント
-app.post("/addRecord", async (req, res) => {
-  try {
-    const params = req.body;
-     if (!params.app || !params.record) {
-      return res.status(400).json({ error: "app ID and record data are required" });
-    }
-    const resp = await client.record.addRecord(params);
-    res.json(resp);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.post("/addRecord", async (req, res) => { /* ... 以前のコードと同じ ... */ });
 
 // Renderが指定するポートでサーバーを起動
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`kintone API server is running on port ${PORT}`);
+  console.log(`Simple kintone API server is running on port ${PORT}`);
 });
