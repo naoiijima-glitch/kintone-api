@@ -1,84 +1,95 @@
 import express from "express";
 import { KintoneRestAPIClient } from "@kintone/rest-api-client";
+import OpenAI from "openai";
 
-// Expressアプリを初期化
+// --- クライアントの初期化 ---
 const app = express();
 app.use(express.json());
 
-// --- ▼▼▼ ここからが最終調査コード ▼▼▼ ---
-// アクセスキーを検証し、その内容をログに出力する「門番」関数
-const authMiddleware = (req, res, next) => {
-  const expectedKey = process.env.POE_ACCESS_KEY;
-  const authHeader = req.headers.authorization;
+const openai = new OpenAI({
+  apiKey: process.env.NEOAI_APIKEY,
+  baseURL: process.env.NEOAI_BASE_URL,
+});
 
-  // --- ログ出力部分 ---
-  console.log('--- Access Key Check ---');
-  console.log('Poeから受信したヘッダー (Authorization):', authHeader);
-  console.log('Renderに設定された期待されるキー (加工後):', `Bearer ${expectedKey}`);
-  // --- ログ出力部分ここまで ---
-
-  if (!expectedKey) {
-    return next();
-  }
-
-  if (authHeader === `Bearer ${expectedKey}`) {
-    console.log('>>> 結果: キーが一致しました。アクセスを許可します。');
-    next();
-  } else {
-    console.error('>>> 結果: キーが一致しません！アクセスを拒否します。');
-    res.status(401).send("Unauthorized");
-  }
+// --- Poeの応答形式に対応するためのヘルパー関数 ---
+const sendPoeEvent = (res, event) => {
+  res.write(`data: ${JSON.stringify(event)}\n\n`);
 };
-// --- ▲▲▲ ここまでが最終調査コード ▲▲▲ ---
 
+// --- メインの処理 ---
+app.post('/', async (req, res) => {
+  // アクセスキーの検証
+  const expectedKey = process.env.POE_ACCESS_KEY;
+  if (expectedKey && req.headers.authorization !== `Bearer ${expectedKey}`) {
+    return res.status(401).send("Unauthorized");
+  }
 
-// 1. Poeの疎通確認専用のエンドポイント
-app.all('/', (req, res) => {
-  console.log('Poe reachability check received.');
-  res.status(200).json({ status: "ok" });
-});
+  const request = req.body;
 
-// 2. セキュリティチェック（門番）を有効化
-app.use(authMiddleware);
+  // Poeからのリクエストタイプに応じて処理を分岐
+  if (request.type === "settings") {
+    return res.json({ allow_attachments: false });
+  }
 
-// 3. kintone操作用のAPIエンドポイント
-app.post("/getRecords", async (req, res) => {
-  try {
-    const client = new KintoneRestAPIClient({
-      baseUrl: process.env.KINTONE_BASE_URL,
-      auth: { apiToken: process.env.KINTONE_API_TOKEN },
-    });
-    // ... (以下、変更なし)
-    const params = req.body;
-    if (!params.app) {
-      return res.status(400).json({ error: "app ID is required" });
+  if (request.type === "query") {
+    try {
+      // Poeの応答形式(SSE)のためのヘッダー設定
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      // 会話履歴から最新のユーザーメッセージを取得
+      const latestMessage = request.query[request.query.length - 1].content;
+      
+      // --- ▼▼▼ ここからが変更点 ▼▼▼ ---
+      // neoAI (OpenAI互換API) を呼び出し
+      // neoAI側でプロンプトが設定されているため、ここではユーザーのメッセージのみを送信します。
+      const completion = await openai.chat.completions.create({
+        model: "GPT-4o mini", // 利用するモデル名
+        messages: [
+          { role: "user", content: latestMessage },
+        ],
+        // response_format: { type: "json_object" }, // 互換APIが対応していない場合があるのでコメントアウト
+      });
+      // --- ▲▲▲ ここまでが変更点 ▲▲▲ ---
+      
+      const aiResponse = JSON.parse(completion.choices[0].message.content);
+
+      if (aiResponse.action === "getRecords" || aiResponse.action === "addRecord") {
+        sendPoeEvent(res, { type: "text", text: "kintoneと通信しています..." });
+        
+        const client = new KintoneRestAPIClient({
+          baseUrl: process.env.KINTONE_BASE_URL,
+          auth: { apiToken: process.env.KINTONE_API_TOKEN },
+        });
+
+        let kintoneResultText = "";
+        if (aiResponse.action === "getRecords") {
+          const resp = await client.record.getRecords(aiResponse.params);
+          kintoneResultText = `レコードが${resp.records.length}件見つかりました。`;
+          // (結果の表示部分は省略)
+        } else if (aiResponse.action === "addRecord") {
+          const resp = await client.record.addRecord(aiResponse.params);
+          kintoneResultText = `レコードを登録しました。新しいレコード番号は ${resp.id} です。`;
+        }
+        sendPoeEvent(res, { type: "text", text: kintoneResultText });
+      } else if (aiResponse.action === "clarify") {
+        sendPoeEvent(res, { type: "text", text: aiResponse.clarification });
+      }
+
+    } catch (error) {
+      console.error(error);
+      sendPoeEvent(res, { type: "text", text: `エラーが発生しました: ${error.message}` });
+    } finally {
+      sendPoeEvent(res, { type: "done" });
+      res.end();
     }
-    const resp = await client.record.getRecords(params);
-    res.json(resp.records);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
-app.post("/addRecord", async (req, res) => {
-  try {
-    const client = new KintoneRestAPIClient({
-      baseUrl: process.env.KINTONE_BASE_URL,
-      auth: { apiToken: process.env.KINTONE_API_TOKEN },
-    });
-    // ... (以下、変更なし)
-    const params = req.body;
-    if (!params.app || !params.record) {
-      return res.status(400).json({ error: "app ID and record data are required" });
-    }
-    const resp = await client.record.addRecord(params);
-    res.json(resp);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// 4. サーバーを起動
+// --- サーバーの起動 ---
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Simple kintone API server is running on port ${PORT}`);
+  console.log(`Final kintone AI server is running on port ${PORT}`);
 });
