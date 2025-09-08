@@ -18,11 +18,13 @@ const sendPoeEvent = (res, event) => {
 
 // --- メインの処理 ---
 app.post('/', async (req, res) => {
-  // アクセスキーの検証
+  // アクセスキーの検証はPoeがキーを送ってこないため、無効化します。
+  /*
   const expectedKey = process.env.POE_ACCESS_KEY;
   if (expectedKey && req.headers.authorization !== `Bearer ${expectedKey}`) {
     return res.status(401).send("Unauthorized");
   }
+  */
 
   const request = req.body;
 
@@ -39,20 +41,13 @@ app.post('/', async (req, res) => {
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders();
 
-      // 会話履歴から最新のユーザーメッセージを取得
       const latestMessage = request.query[request.query.length - 1].content;
-      
-      // --- ▼▼▼ ここからが変更点 ▼▼▼ ---
+
       // neoAI (OpenAI互換API) を呼び出し
-      // neoAI側でプロンプトが設定されているため、ここではユーザーのメッセージのみを送信します。
       const completion = await openai.chat.completions.create({
-        model: "GPT-4o mini", // 利用するモデル名
-        messages: [
-          { role: "user", content: latestMessage },
-        ],
-        // response_format: { type: "json_object" }, // 互換APIが対応していない場合があるのでコメントアウト
+        model: "GPT-4o mini",
+        messages: [{ role: "user", content: latestMessage }],
       });
-      // --- ▲▲▲ ここまでが変更点 ▲▲▲ ---
       
       const aiResponse = JSON.parse(completion.choices[0].message.content);
 
