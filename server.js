@@ -5,17 +5,32 @@ import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 const app = express();
 app.use(express.json());
 
-// アクセスキーを検証する「門番」の役割を持つ関数（ミドルウェア）
+// --- ▼▼▼ ここからが最終調査コード ▼▼▼ ---
+// アクセスキーを検証し、その内容をログに出力する「門番」関数
 const authMiddleware = (req, res, next) => {
   const expectedKey = process.env.POE_ACCESS_KEY;
-  if (!expectedKey) { return next(); }
   const authHeader = req.headers.authorization;
+
+  // --- ログ出力部分 ---
+  console.log('--- Access Key Check ---');
+  console.log('Poeから受信したヘッダー (Authorization):', authHeader);
+  console.log('Renderに設定された期待されるキー (加工後):', `Bearer ${expectedKey}`);
+  // --- ログ出力部分ここまで ---
+
+  if (!expectedKey) {
+    return next();
+  }
+
   if (authHeader === `Bearer ${expectedKey}`) {
+    console.log('>>> 結果: キーが一致しました。アクセスを許可します。');
     next();
   } else {
+    console.error('>>> 結果: キーが一致しません！アクセスを拒否します。');
     res.status(401).send("Unauthorized");
   }
 };
+// --- ▲▲▲ ここまでが最終調査コード ▲▲▲ ---
+
 
 // 1. Poeの疎通確認専用のエンドポイント
 app.all('/', (req, res) => {
@@ -26,17 +41,14 @@ app.all('/', (req, res) => {
 // 2. セキュリティチェック（門番）を有効化
 app.use(authMiddleware);
 
-// --- ▼▼▼ ここからが変更点 ▼▼▼ ---
-// kintoneクライアントの初期化を、各エンドポイントの中に移動させる
-
-// レコード取得
+// 3. kintone操作用のAPIエンドポイント
 app.post("/getRecords", async (req, res) => {
   try {
     const client = new KintoneRestAPIClient({
       baseUrl: process.env.KINTONE_BASE_URL,
       auth: { apiToken: process.env.KINTONE_API_TOKEN },
     });
-    
+    // ... (以下、変更なし)
     const params = req.body;
     if (!params.app) {
       return res.status(400).json({ error: "app ID is required" });
@@ -47,15 +59,13 @@ app.post("/getRecords", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// レコード登録
 app.post("/addRecord", async (req, res) => {
   try {
     const client = new KintoneRestAPIClient({
       baseUrl: process.env.KINTONE_BASE_URL,
       auth: { apiToken: process.env.KINTONE_API_TOKEN },
     });
-
+    // ... (以下、変更なし)
     const params = req.body;
     if (!params.app || !params.record) {
       return res.status(400).json({ error: "app ID and record data are required" });
@@ -66,9 +76,8 @@ app.post("/addRecord", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// --- ▲▲▲ ここまでが変更点 ▲▲▲ ---
 
-// サーバーを起動
+// 4. サーバーを起動
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Simple kintone API server is running on port ${PORT}`);
