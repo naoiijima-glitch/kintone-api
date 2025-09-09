@@ -45,7 +45,7 @@ app.post('/', async (req, res) => {
 
       // neoAI (OpenAI互換API) を呼び出し
       const completion = await openai.chat.completions.create({
-        model: "GPT-4o mini",
+        model: "GPT-4o",
         messages: [{ role: "user", content: latestMessage }],
       });
       
@@ -88,3 +88,4 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
