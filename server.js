@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { KintoneRestAPIClient } from "@kintone/rest-api-client";
-import axios from "axios"; // openaiの代わりにaxiosをインポート
+import axios from "axios";
 
 // Expressアプリを初期化
 const app = express();
@@ -27,9 +27,6 @@ app.post('/', async (req, res) => {
 
     const latestMessage = request.query[request.query.length - 1].content;
     
-    // --- ▼▼▼ ここからがaxiosを使った通信処理 ▼▼▼ ---
-    
-    // neoAIに送信するリクエストのヘッダーとボディを、GASのコードと全く同じように定義
     const headers = {
       'Authorization': `Bearer ${process.env.NEOAI_APIKEY}`,
       'Content-type': 'application/json'
@@ -42,18 +39,20 @@ app.post('/', async (req, res) => {
       stream: false
     };
 
-    // axiosでneoAIのAPIを呼び出す
     const neoAIResponse = await axios.post(`${process.env.NEOAI_BASE_URL}/chat/completions`, body, { headers });
+
+    // --- ▼▼▼ ここに追加 ▼▼▼ ---
+    console.log('--- neoAIからの応答データ ---');
+    console.log(JSON.stringify(neoAIResponse.data, null, 2));
+    console.log('---------------------------');
+    // --- ▲▲▲ ここまで追加 ▲▲▲ ---
+
     const aiResponse = JSON.parse(neoAIResponse.data.choices[0].message.content);
     
-    // --- ▲▲▲ ここまで ▲▲▲ ---
-
     if (aiResponse.action === "getRecords" || aiResponse.action === "addRecord") {
       // (kintoneとの通信部分は変更なし)
-      // ...
     } else if (aiResponse.action === "clarify") {
       // (変更なし)
-      // ...
     }
 
   } catch (error) {
@@ -66,10 +65,7 @@ app.post('/', async (req, res) => {
 });
 
 // サーバーの起動
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002; // ポート番号はあなたの環境に合わせてください
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
-
-
-
