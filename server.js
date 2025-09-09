@@ -3,16 +3,21 @@ import express from "express";
 import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 import axios from "axios";
 
+// Expressアプリを初期化
 const app = express();
 app.use(express.json());
 
+// Poeの応答形式に対応するためのヘルパー関数
 const sendPoeEvent = (res, event) => {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 };
 
+// メインの処理
 app.post('/', async (req, res) => {
   const request = req.body;
-  if (request.type !== "query") { return res.json({}); }
+  if (request.type !== "query") {
+    return res.json({});
+  }
 
   try {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -22,8 +27,13 @@ app.post('/', async (req, res) => {
 
     const latestMessage = request.query[request.query.length - 1].content;
     
+    // --- ▼▼▼ ここが最後の修正点 ▼▼▼ ---
+    
+    // .envの使用をやめ、URLを直接コードに記述する
+    const baseURL = "https://chat.neoai.jp/api/endpoints/23b9940c-43ba-46fd-aa0b-8c3d365396d9"; 
+    
     const headers = {
-      'Authorization': `Bearer ${process.env.NEOAI_APIKEY}`,
+      'Authorization': `Bearer ${process.env.NEOAI_APIKEY}`, // APIキーは.envから読み込みます
       'Content-type': 'application/json'
     };
     const body = {
@@ -32,32 +42,41 @@ app.post('/', async (req, res) => {
       stream: false
     };
 
-    const baseURL = process.env.NEOAI_BASE_URL;
-
-    // --- ▼▼▼ 最終デバッグコード ▼▼▼ ---
-    console.log('--- URL Forensic Analysis ---');
-    if (baseURL) {
-      console.log('取得したURL文字列:', `>${baseURL}<`); // 記号で囲んで、前後の空白や改行を可視化
-      console.log('文字列の長さ:', baseURL.length);
-      console.log('最初の文字のコード番号:', baseURL.charCodeAt(0));
-      console.log('最後の文字のコード番号:', baseURL.charCodeAt(baseURL.length - 1));
-    } else {
-      console.log('NEOAI_BASE_URLがundefinedです。');
-    }
-    console.log('---------------------------');
+    const neoAIResponse = await axios.post(`${baseURL}/chat/completions`, body, { headers });
+    
     // --- ▲▲▲ ここまで ▲▲▲ ---
-
-    const finalURL = baseURL.trim();
-    const neoAIResponse = await axios.post(`${finalURL}/chat/completions`, body, { headers });
 
     const aiResponse = JSON.parse(neoAIResponse.data.content);
     
-    // ... (以降のkintone処理は変更なし)
-    if (aiResponse.action === "getRecords" || aiResponse.action === "addRecord") { /* ... */ }
-    else if (aiResponse.action === "clarify") { /* ... */ }
+    if (aiResponse.action === "getRecords" || aiResponse.action === "addRecord") {
+      sendPoeEvent(res, { type: "text", text: "kintoneと通信しています..." });
+      
+      const client = new KintoneRestAPIClient({
+        baseUrl: process.env.KINTONE_BASE_URL.trim(),
+        auth: { apiToken: process.env.KINTONE_API_TOKEN },
+      });
+
+      let kintoneResultText = "";
+      if (aiResponse.action === "getRecords") {
+        const resp = await client.record.getRecords(aiResponse.params);
+        kintoneResultText = `レコードが${resp.records.length}件見つかりました。\n`;
+        resp.records.forEach(r => {
+          const companyName = r.CompanyName ? r.CompanyName.value : "取得不可";
+          kintoneResultText += `\n- レコード番号: ${r.$id.value}, 会社名: ${companyName}`;
+        });
+      } else if (aiResponse.action === "addRecord") {
+        const resp = await client.record.addRecord(aiResponse.params);
+        kintoneResultText = `レコードを登録しました。新しいレコード番号は ${resp.id} です。`;
+      }
+      sendPoeEvent(res, { type: "text", text: kintoneResultText });
+
+    } else if (aiResponse.action === "clarify") {
+      sendPoeEvent(res, { type: "text", text: aiResponse.clarification });
+    }
 
   } catch (error) {
-    console.error("!!! An error occurred !!!", error.message);
+    console.error("!!! An error occurred !!!", error.response ? error.response.data : error.message);
+    sendPoeEvent(res, { type: "text", text: `エラーが発生しました: ${error.message}` });
   } finally {
     sendPoeEvent(res, { type: "done" });
     res.end();
