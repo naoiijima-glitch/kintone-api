@@ -7,6 +7,9 @@
   "scripts": {
     "start": "node server.js"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@kintone/rest-api-client": "^5.0.4",
     "express": "^4.19.2",
@@ -14,3 +17,4 @@
   }
 
 }
+
