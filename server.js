@@ -5,6 +5,7 @@ import axios from "axios";
 
 // Expressアプリを初期化
 const app = express();
+console.log('起動時に読み込んだURL:', process.env.NEOAI_BASE_URL);
 app.use(express.json());
 
 // Poeの応答形式に対応するためのヘルパー関数
@@ -91,3 +92,4 @@ const PORT = process.env.PORT || 3000; // ポート番号3000
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
