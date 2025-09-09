@@ -37,7 +37,7 @@ app.post('/', async (req, res) => {
     const body = {
       model: 'GPT-4o',
       messages: [
-        { role: "user", content: "（ここにプロンプトを記述）" + latestMessage }
+        { role: "user", content: latestMessage }
       ],
       stream: false
     };
@@ -70,3 +70,4 @@ const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
