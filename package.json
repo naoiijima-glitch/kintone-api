@@ -1,22 +1,16 @@
 {
-  "name": "kintone-api",
+  "name": "final-kintone-bot-server",
   "version": "1.0.0",
-  "description": "A simple API server for kintone",
+  "description": "An AI-powered API server for kintone, compatible with Poe bots",
   "main": "server.js",
   "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": "18.x"
-  },
   "dependencies": {
     "@kintone/rest-api-client": "^5.0.4",
+    "axios": "^1.7.2",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "openai": "^4.52.7"
+    "express": "^4.19.2"
+  },
+  "scripts": {
+    "start": "node server.js"
   }
-
 }
-
-
