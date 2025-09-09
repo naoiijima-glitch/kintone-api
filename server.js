@@ -84,10 +84,11 @@ app.post('/', async (req, res) => {
 });
 
 // --- サーバーの起動 ---
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
 
 
 
