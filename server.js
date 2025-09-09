@@ -43,7 +43,7 @@ app.post('/', async (req, res) => {
     };
 
     // axiosでneoAIのAPIを呼び出す
-    const neoAIResponse = await axios.post(process.env.NEOAI_BASE_URL, body, { headers });
+    const neoAIResponse = await axios.post(`${process.env.NEOAI_BASE_URL}/chat/completions`, body, { headers });
     const aiResponse = JSON.parse(neoAIResponse.data.choices[0].message.content);
     
     // --- ▲▲▲ ここまで ▲▲▲ ---
@@ -70,5 +70,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
 
 
