@@ -3,23 +3,35 @@ import express from "express";
 import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 import axios from "axios";
 
-// Expressアプリを初期化
 const app = express();
 app.use(express.json());
 
-// Poeの応答形式に対応するためのヘルパー関数
 const sendPoeEvent = (res, event) => {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 };
 
-// メインの処理
+// --- すべてのリクエストを受け付ける唯一の窓口 ---
 app.post('/', async (req, res) => {
-  const request = req.body;
-  if (request.type !== "query") {
-    return res.json({});
+  // アクセスキーの検証
+  const expectedKey = process.env.POE_ACCESS_KEY;
+  if (expectedKey && req.headers.authorization !== `Bearer ${expectedKey}`) {
+    return res.status(401).send("Unauthorized");
   }
 
+  const request = req.body;
+
+  // --- リクエストの中身を見て処理を仕分ける ---
+  
+  // 1. settingsリクエストか、中身が不明な場合は単純な成功を返す (疎通確認用)
+  if (request.type !== "query") {
+    console.log("Settings or unknown request received. Replying OK.");
+    return res.json({ status: "ok" });
+  }
+
+  // 2. queryリクエスト (実際の会話) の場合
+  console.log("Query request received. Starting AI and kintone process...");
   try {
+    // Poeのストリーミング応答のためのヘッダー設定
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -27,13 +39,8 @@ app.post('/', async (req, res) => {
 
     const latestMessage = request.query[request.query.length - 1].content;
     
-    // --- ▼▼▼ ここが最後の修正点 ▼▼▼ ---
-    
-    // .envの使用をやめ、URLを直接コードに記述する
-    const baseURL = "https://chat.neoai.jp/api/endpoints/23b9940c-43ba-46fd-aa0b-8c3d365396d9"; 
-    
     const headers = {
-      'Authorization': `Bearer ${process.env.NEOAI_APIKEY}`, // APIキーは.envから読み込みます
+      'Authorization': `Bearer ${process.env.NEOAI_APIKEY}`,
       'Content-type': 'application/json'
     };
     const body = {
@@ -42,9 +49,8 @@ app.post('/', async (req, res) => {
       stream: false
     };
 
+    const baseURL = process.env.NEOAI_BASE_URL.trim();
     const neoAIResponse = await axios.post(`${baseURL}/chat/completions`, body, { headers });
-    
-    // --- ▲▲▲ ここまで ▲▲▲ ---
 
     const aiResponse = JSON.parse(neoAIResponse.data.content);
     
@@ -83,7 +89,8 @@ app.post('/', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+// --- サーバーの起動 ---
+const PORT = process.env.PORT || 3000; // ポート番号3000
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
