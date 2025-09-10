@@ -28,6 +28,15 @@ app.post('/', async (req, res) => {
     return res.json({ status: "ok" });
   }
 
+  // --- ▼▼▼ ここからが最後の調査コード ▼▼▼ ---
+  if (request.type !== "query") {
+    console.log("--- A non-query request was received ---");
+    console.log("Request Body:", JSON.stringify(request, null, 2));
+    console.log("--------------------------------------");
+    return res.json({ status: "ok" });
+  }
+  // --- ▲▲▲ ここまで ▲▲▲ ---
+
   // 2. queryリクエスト (実際の会話) の場合
   console.log("Query request received. Starting AI and kintone process...");
   try {
@@ -94,3 +103,4 @@ const PORT = process.env.PORT || 3000; // ポート番号3000
 app.listen(PORT, () => {
   console.log(`Final kintone AI server is running on port ${PORT}`);
 });
+
